@@ -1,3 +1,4 @@
+using SimpleStore.Catalog.API.Client;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SimpleStore.Data;
@@ -13,7 +14,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // Add DbContext
-builder.AddNpgsqlDbContext<CatalogDbContext>("catalogdb");
+builder.AddCatalogApiClient();
 builder.AddNpgsqlDbContext<OrderDbContext>("orderdb");
 builder.AddNpgsqlDbContext<IdentityDbContext>("identitydb");
 
@@ -56,7 +57,6 @@ builder.Services.AddHttpContextAccessor();
 
 // Register services
 builder.Services.AddScoped<ICartService, CartService>();
-builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 
 var app = builder.Build();
@@ -79,13 +79,11 @@ app.UseAuthorization();
 // Seed database
 using (var scope = app.Services.CreateScope())
 {
-    var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
     var orders = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
     var identity = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     await identity.Database.MigrateAsync();
     await orders.Database.MigrateAsync();
-    await DbSeeder.SeedCatalogAsync(catalog);
     await DbSeeder.SeedIdentityAsync(userManager);
 }
 

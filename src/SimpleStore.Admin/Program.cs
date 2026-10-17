@@ -1,3 +1,4 @@
+using SimpleStore.Catalog.API.Client;
 using SimpleStore.Admin.Components;
 using SimpleStore.Data;
 
@@ -8,7 +9,7 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.AddNpgsqlDbContext<CatalogDbContext>("catalogdb");
+builder.AddCatalogApiClient();
 builder.AddNpgsqlDbContext<OrderDbContext>("orderdb");
 builder.AddNpgsqlDbContext<IdentityDbContext>("identitydb");
 

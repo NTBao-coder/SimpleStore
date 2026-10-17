@@ -1,9 +1,10 @@
+using SimpleStore.Catalog.API.Data;
 ﻿using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace SimpleStore.Data.Migrations.Catalog
+namespace SimpleStore.Catalog.API.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCatalog : Migration

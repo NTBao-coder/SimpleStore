@@ -1,4 +1,4 @@
-namespace SimpleStore.Data.Models;
+namespace SimpleStore.Catalog.API.Models;
 public class Category
 {
     public int Id { get; set; }

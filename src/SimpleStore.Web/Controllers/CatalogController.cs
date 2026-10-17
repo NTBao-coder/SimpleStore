@@ -1,19 +1,19 @@
 using Microsoft.AspNetCore.Mvc;
-using SimpleStore.Web.Services;
+using SimpleStore.Catalog.API.Client;
 
 namespace SimpleStore.Web.Controllers;
 
 public class CatalogController : Controller
 {
-    private readonly ICatalogService _catalog;
-    public CatalogController(ICatalogService catalog) => _catalog = catalog;
+    private readonly ICatalogApiClient _catalog;
+    public CatalogController(ICatalogApiClient catalog) => _catalog = catalog;
 
-    public async Task<IActionResult> Index(int? categoryId, string? search)
+    public async Task<IActionResult> Index(int? categoryId, string? search, int page = 1)
     {
-        ViewBag.Categories = await _catalog.GetCategoriesAsync();
+        ViewBag.Categories = await _catalog.GetAllCategoriesAsync();
         ViewBag.SelectedCategoryId = categoryId;
         ViewBag.SearchTerm = search;
-        var products = await _catalog.GetProductsAsync(categoryId, search);
+        var products = await _catalog.GetProductsAsync(page: page, pageSize: 12, categoryId: categoryId, search: search);
         return View(products);
     }
 

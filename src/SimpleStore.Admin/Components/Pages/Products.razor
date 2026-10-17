@@ -1,5 +1,5 @@
 @page "/products"
-@inject CatalogDbContext Db
+@inject ICatalogApiClient Catalog
 
 <PageTitle>Products</PageTitle>
 
@@ -103,149 +103,82 @@
     </div>
 </div>
 
+<div class="my-3">
+    <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => ChangePageAsync(-1)">Previous</button>
+    <span>Page @(page) / @Math.Max(1, totalPages)</span>
+    <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => ChangePageAsync(1)">Next</button>
+</div>
+
 @code {
-    private readonly List<ProductRow> products = [];
-    private readonly List<CategoryOption> categories = [];
-    private readonly ProductForm form = new() { ImageUrl = "/images/products/placeholder.jpg" };
+    private List<ProductDto> products = [];
+    private ProductDto form = new();
     private int? editingId;
     private string? message;
-
+    private int page = 1;
+    private int totalPages;
+    private List<CategoryDto> categories = [];
     protected override async Task OnInitializedAsync()
     {
-        await LoadCategoriesAsync();
-        await LoadProductsAsync();
+        try
+        {
+            categories = await Catalog.GetAllCategoriesAsync();
+            await LoadAsync();
+        }
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
-    private async Task LoadCategoriesAsync()
+    private async Task LoadAsync()
     {
-        categories.Clear();
-        categories.AddRange(await Db.Categories
-            .AsNoTracking()
-            .OrderBy(c => c.Name)
-            .Select(c => new CategoryOption { Id = c.Id, Name = c.Name })
-            .ToListAsync());
+        var result = await Catalog.GetProductsAsync(page: page, pageSize: 20);
+        if (page > 1 && result.Items.Count == 0)
+        {
+            page = Math.Max(1, result.TotalPages);
+            result = await Catalog.GetProductsAsync(page: page, pageSize: 20);
+        }
+        products = result.Items;
+        totalPages = result.TotalPages;
     }
-
-    private async Task LoadProductsAsync()
+    private async Task ChangePageAsync(int delta)
     {
-        products.Clear();
-        products.AddRange(await Db.Products
-            .AsNoTracking()
-            .Include(p => p.Category)
-            .OrderBy(p => p.Name)
-            .Select(p => new ProductRow
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Price = p.Price,
-                Stock = p.Stock,
-                ImageUrl = p.ImageUrl,
-                CategoryId = p.CategoryId,
-                CategoryName = p.Category.Name
-            })
-            .ToListAsync());
+        var previous = page;
+        page += delta;
+        try { await LoadAsync(); }
+        catch (HttpRequestException ex) { page = previous; message = $"Catalog request failed: {ex.Message}"; }
     }
-
-    private void Edit(ProductRow row)
+    private void Edit(ProductDto row)
     {
         editingId = row.Id;
-        form.Name = row.Name;
-        form.Description = row.Description;
-        form.Price = row.Price;
-        form.Stock = row.Stock;
-        form.ImageUrl = row.ImageUrl;
-        form.CategoryId = row.CategoryId;
+        form = new ProductDto
+        {
+            Name = row.Name, Description = row.Description,
+            Price = row.Price, Stock = row.Stock, ImageUrl = row.ImageUrl, CategoryId = row.CategoryId,
+        };
         message = null;
     }
-
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(form.Name) || form.CategoryId <= 0)
+        try
         {
-            message = "Product name and category are required.";
-            return;
+            if (editingId is int id) await Catalog.UpdateProductAsync(id, form);
+            else await Catalog.CreateProductAsync(form);
+            message = "Product saved.";
+            ResetForm();
+            await LoadAsync();
         }
-
-        if (editingId is null)
-        {
-            Db.Products.Add(new Product
-            {
-                Name = form.Name.Trim(),
-                Description = form.Description.Trim(),
-                Price = form.Price,
-                Stock = form.Stock,
-                ImageUrl = string.IsNullOrWhiteSpace(form.ImageUrl) ? "/images/products/placeholder.jpg" : form.ImageUrl.Trim(),
-                CategoryId = form.CategoryId
-            });
-            message = "Product created.";
-        }
-        else
-        {
-            var product = await Db.Products.FirstOrDefaultAsync(p => p.Id == editingId.Value);
-            if (product is null)
-            {
-                return;
-            }
-
-            product.Name = form.Name.Trim();
-            product.Description = form.Description.Trim();
-            product.Price = form.Price;
-            product.Stock = form.Stock;
-            product.ImageUrl = string.IsNullOrWhiteSpace(form.ImageUrl) ? "/images/products/placeholder.jpg" : form.ImageUrl.Trim();
-            product.CategoryId = form.CategoryId;
-            message = "Product updated.";
-        }
-
-        await Db.SaveChangesAsync();
-        await LoadProductsAsync();
-        ResetForm();
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
     private async Task DeleteAsync(int id)
     {
-        var product = await Db.Products.FirstOrDefaultAsync(p => p.Id == id);
-        if (product is null)
+        try
         {
-            return;
+            await Catalog.DeleteProductAsync(id);
+            message = "Product deleted.";
+            await LoadAsync();
         }
-
-        Db.Products.Remove(product);
-        await Db.SaveChangesAsync();
-        message = "Product deleted.";
-        await LoadProductsAsync();
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
     private void ResetForm()
     {
         editingId = null;
-        form.Name = string.Empty;
-        form.Description = string.Empty;
-        form.Price = 0m;
-        form.Stock = 0;
-        form.ImageUrl = "/images/products/placeholder.jpg";
-        form.CategoryId = 0;
-    }
-
-    private class ProductForm
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public decimal Price { get; set; }
-        public int Stock { get; set; }
-        public string ImageUrl { get; set; } = string.Empty;
-        public int CategoryId { get; set; }
-    }
-
-    private sealed class ProductRow : ProductForm
-    {
-        public int Id { get; set; }
-        public string CategoryName { get; set; } = string.Empty;
-    }
-
-    private sealed class CategoryOption
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
+        form = new();
     }
 }

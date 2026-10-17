@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../SimpleStore.Catalog.API.Client/SimpleStore.Catalog.API.Client.csproj" />
     <ProjectReference Include="..\SimpleStore.Data\SimpleStore.Data.csproj" />
     <ProjectReference Include="..\SimpleStore.ServiceDefaults\SimpleStore.ServiceDefaults.csproj" />
   </ItemGroup>

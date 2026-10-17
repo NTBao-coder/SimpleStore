@@ -1,5 +1,5 @@
 @page "/categories"
-@inject CatalogDbContext Db
+@inject ICatalogApiClient Catalog
 
 <PageTitle>Categories</PageTitle>
 
@@ -72,114 +72,79 @@
     </div>
 </div>
 
+<div class="my-3">
+    <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => ChangePageAsync(-1)">Previous</button>
+    <span>Page @(page) / @Math.Max(1, totalPages)</span>
+    <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => ChangePageAsync(1)">Next</button>
+</div>
+
 @code {
-    private readonly List<CategoryRow> categories = [];
-    private readonly CategoryForm form = new();
+    private List<CategoryDto> categories = [];
+    private CategoryDto form = new();
     private int? editingId;
     private string? message;
-
+    private int page = 1;
+    private int totalPages;
     protected override async Task OnInitializedAsync()
     {
-        await LoadAsync();
+        try
+        {
+            await LoadAsync();
+        }
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
     private async Task LoadAsync()
     {
-        categories.Clear();
-
-        var data = await Db.Categories
-            .AsNoTracking()
-            .Select(c => new CategoryRow
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Description = c.Description,
-                ProductCount = c.Products.Count
-            })
-            .OrderBy(c => c.Name)
-            .ToListAsync();
-
-        categories.AddRange(data);
+        var result = await Catalog.GetCategoriesAsync(page: page, pageSize: 20);
+        if (page > 1 && result.Items.Count == 0)
+        {
+            page = Math.Max(1, result.TotalPages);
+            result = await Catalog.GetCategoriesAsync(page: page, pageSize: 20);
+        }
+        categories = result.Items;
+        totalPages = result.TotalPages;
     }
-
-    private void Edit(CategoryRow row)
+    private async Task ChangePageAsync(int delta)
+    {
+        var previous = page;
+        page += delta;
+        try { await LoadAsync(); }
+        catch (HttpRequestException ex) { page = previous; message = $"Catalog request failed: {ex.Message}"; }
+    }
+    private void Edit(CategoryDto row)
     {
         editingId = row.Id;
-        form.Name = row.Name;
-        form.Description = row.Description;
+        form = new CategoryDto
+        {
+            Name = row.Name, Description = row.Description,
+        };
         message = null;
     }
-
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(form.Name))
+        try
         {
-            message = "Category name is required.";
-            return;
+            if (editingId is int id) await Catalog.UpdateCategoryAsync(id, form);
+            else await Catalog.CreateCategoryAsync(form);
+            message = "Category saved.";
+            ResetForm();
+            await LoadAsync();
         }
-
-        if (editingId is null)
-        {
-            Db.Categories.Add(new Category
-            {
-                Name = form.Name.Trim(),
-                Description = form.Description.Trim()
-            });
-            message = "Category created.";
-        }
-        else
-        {
-            var category = await Db.Categories.FirstOrDefaultAsync(c => c.Id == editingId.Value);
-            if (category is null)
-            {
-                return;
-            }
-
-            category.Name = form.Name.Trim();
-            category.Description = form.Description.Trim();
-            message = "Category updated.";
-        }
-
-        await Db.SaveChangesAsync();
-        await LoadAsync();
-        ResetForm();
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
     private async Task DeleteAsync(int id)
     {
-        var category = await Db.Categories
-            .Include(c => c.Products)
-            .FirstOrDefaultAsync(c => c.Id == id);
-
-        if (category is null || category.Products.Count > 0)
+        try
         {
-            return;
+            await Catalog.DeleteCategoryAsync(id);
+            message = "Category deleted.";
+            await LoadAsync();
         }
-
-        Db.Categories.Remove(category);
-        await Db.SaveChangesAsync();
-        message = "Category deleted.";
-        await LoadAsync();
+        catch (HttpRequestException ex) { message = $"Catalog request failed: {ex.Message}"; }
     }
-
     private void ResetForm()
     {
         editingId = null;
-        form.Name = string.Empty;
-        form.Description = string.Empty;
-    }
-
-    private sealed class CategoryForm
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-    }
-
-    private sealed class CategoryRow
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int ProductCount { get; set; }
+        form = new();
     }
 }
