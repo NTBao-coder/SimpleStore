@@ -158,8 +158,8 @@ Chấp nhận: Đủ tiền hoàn tất; thiếu tiền hủy đơn và trả t�
 | Mốc | Trạng thái | Ghi chú |
 |---|---|---|
 | v-skeleton | Hoàn tất | Release 0 lỗi; 10 resource và health đã smoke-test; xem [ghi chú](chapters/v-skeleton.md). Chưa push vì thiếu origin. |
-| v0 | Chưa bắt đầu | |
-| v1 | Chưa bắt đầu | |
+| v0 | Có mã nền | Commit có sẵn `97ec50f`; chưa có commit/tag và ghi chú theo quy trình v0. Giữ nguyên lịch sử. |
+| v1 | Hoàn tất triển khai | Release 0 lỗi; ba migration độc lập; smoke PostgreSQL trực tiếp. Chưa chạy AppHost/Docker. Xem [ghi chú](chapters/v1.md). |
 | v2 | Chưa bắt đầu | |
 | v3 | Chưa bắt đầu | |
 | v4 | Chưa bắt đầu | |
