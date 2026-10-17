@@ -8,7 +8,13 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.AddNpgsqlDbContext<StoreDbContext>("storedb");
+builder.AddNpgsqlDbContext<CatalogDbContext>("catalogdb");
+builder.AddNpgsqlDbContext<OrderDbContext>("orderdb");
+builder.AddNpgsqlDbContext<IdentityDbContext>("identitydb");
+
+// Match Web and design-time Identity schema, including existing passkey support.
+builder.Services.Configure<Microsoft.AspNetCore.Identity.IdentityOptions>(options =>
+    options.Stores.SchemaVersion = Microsoft.AspNetCore.Identity.IdentitySchemaVersions.Version3);
 
 var app = builder.Build();
 

@@ -28,7 +28,7 @@ public static class DbSeeder
         await userManager.CreateAsync(user, DemoUserPassword);
     }
 
-    public static async Task SeedAsync(StoreDbContext context)
+    public static async Task SeedCatalogAsync(CatalogDbContext context)
     {
         await context.Database.MigrateAsync();
         

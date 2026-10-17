@@ -13,7 +13,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // Add DbContext
-builder.AddNpgsqlDbContext<StoreDbContext>("storedb");
+builder.AddNpgsqlDbContext<CatalogDbContext>("catalogdb");
+builder.AddNpgsqlDbContext<OrderDbContext>("orderdb");
+builder.AddNpgsqlDbContext<IdentityDbContext>("identitydb");
 
 // Add Identity (schema v3 enables the passkey table)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -25,7 +27,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireUppercase = false;
     options.SignIn.RequireConfirmedAccount = false;
 })
-.AddEntityFrameworkStores<StoreDbContext>()
+.AddEntityFrameworkStores<IdentityDbContext>()
 .AddDefaultTokenProviders();
 
 builder.Services.Configure<IdentityPasskeyOptions>(options =>
@@ -77,9 +79,13 @@ app.UseAuthorization();
 // Seed database
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
+    var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+    var orders = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
+    var identity = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    await DbSeeder.SeedAsync(context);
+    await identity.Database.MigrateAsync();
+    await orders.Database.MigrateAsync();
+    await DbSeeder.SeedCatalogAsync(catalog);
     await DbSeeder.SeedIdentityAsync(userManager);
 }
 
