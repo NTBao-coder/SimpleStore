@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using SimpleStore.Catalog.API.Client;
 using SimpleStore.Catalog.API.Data;
 using SimpleStore.Catalog.API.Models;
@@ -50,7 +51,7 @@ public static class CatalogEndpoints
             await db.SaveChangesAsync(ct);
             var result = await db.Products.Where(p => p.Id == product.Id).Select(ProductProjection).SingleAsync(ct);
             return Results.Created($"/api/catalog/products/{product.Id}", result);
-        });
+        }).RequireAuthorization("Admin");
         products.MapPut("/{id:int}", async (int id, ProductDto value, CatalogDbContext db, CancellationToken ct) =>
         {
             var product = await db.Products.FindAsync([id], ct);
@@ -60,7 +61,7 @@ public static class CatalogEndpoints
             Apply(product, value);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization("Admin");
         products.MapDelete("/{id:int}", async (int id, CatalogDbContext db, CancellationToken ct) =>
         {
             var product = await db.Products.FindAsync([id], ct);
@@ -68,7 +69,7 @@ public static class CatalogEndpoints
             db.Products.Remove(product);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization("Admin");
 
         var categories = app.MapGroup("/api/catalog/categories");
         categories.MapGet("", async (CatalogDbContext db, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
@@ -93,7 +94,7 @@ public static class CatalogEndpoints
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/catalog/categories/{category.Id}", new CategoryDto
             { Id = category.Id, Name = category.Name, Description = category.Description });
-        });
+        }).RequireAuthorization("Admin");
         categories.MapPut("/{id:int}", async (int id, CategoryDto value, CatalogDbContext db, CancellationToken ct) =>
         {
             var category = await db.Categories.FindAsync([id], ct);
@@ -103,7 +104,7 @@ public static class CatalogEndpoints
             category.Description = value.Description ?? string.Empty;
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization("Admin");
         categories.MapDelete("/{id:int}", async (int id, CatalogDbContext db, CancellationToken ct) =>
         {
             var category = await db.Categories.FindAsync([id], ct);
@@ -113,7 +114,7 @@ public static class CatalogEndpoints
             db.Categories.Remove(category);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        });
+        }).RequireAuthorization("Admin");
     }
 
     private static bool ValidPage(int page, int size) => page > 0 && size is > 0 and <= 100 && (long)(page - 1) * size <= int.MaxValue;

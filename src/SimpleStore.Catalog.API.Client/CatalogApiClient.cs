@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 
 namespace SimpleStore.Catalog.API.Client;
 
-public class CatalogApiClient(HttpClient http) : ICatalogApiClient
+public class CatalogApiClient(HttpClient http, SimpleStore.Identity.API.Client.IApiBearerTokenProvider tokens) : ICatalogApiClient
 {
     private async Task<T> ReadAsync<T>(string path, CancellationToken ct) =>
         await http.GetFromJsonAsync<T>(path, ct) ?? throw new HttpRequestException("Empty catalog response.");
@@ -18,21 +18,31 @@ public class CatalogApiClient(HttpClient http) : ICatalogApiClient
 
     private async Task<T> CreateAsync<T>(string path, T value, CancellationToken ct)
     {
-        using var response = await http.PostAsJsonAsync(path, value, ct);
+        using var response = await SendAuthorizedAsync(HttpMethod.Post, path, value, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<T>(ct) ?? throw new HttpRequestException("Empty catalog response.");
     }
 
     private async Task UpdateAsync<T>(string path, T value, CancellationToken ct)
     {
-        using var response = await http.PutAsJsonAsync(path, value, ct);
+        using var response = await SendAuthorizedAsync(HttpMethod.Put, path, value, ct);
         response.EnsureSuccessStatusCode();
     }
 
     private async Task DeleteAsync(string path, CancellationToken ct)
     {
-        using var response = await http.DeleteAsync(path, ct);
+        using var response = await SendAuthorizedAsync<object>(HttpMethod.Delete, path, null, ct);
         response.EnsureSuccessStatusCode();
+    }
+
+    private async Task<HttpResponseMessage> SendAuthorizedAsync<T>(HttpMethod method, string path, T? value, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        if (value is not null) request.Content = JsonContent.Create(value);
+        var token = await tokens.GetCurrentTokenAsync(ct);
+        if (!string.IsNullOrWhiteSpace(token))
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return await http.SendAsync(request, ct);
     }
 
     public Task<PagedResult<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 20, int? categoryId = null, string? search = null, CancellationToken cancellationToken = default) =>

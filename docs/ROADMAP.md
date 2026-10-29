@@ -59,9 +59,11 @@ Chấp nhận: CRUD catalog qua HTTP; Web/Admin không đọc CatalogDbContext.
 
 ## v3 — Tách Identity API
 
-Phạm vi: JWT và luồng xác thực cho Web/Admin; chuyển quyền sở hữu identity sang service.
+Phạm vi: Identity API sở hữu identitydb; Web/Admin dùng API thay vì DbContext. Identity phát JWT
+ngắn hạn và refresh token xoay vòng; Catalog xác thực JWT và giới hạn thao tác ghi cho Admin.
 
-Chấp nhận: Đăng nhập, refresh/logout; API phân biệt truy cập hợp lệ và trái phép.
+Chấp nhận: Đăng nhập, refresh/logout; API phân biệt truy cập hợp lệ và trái phép. Web/Admin không
+đăng ký IdentityDbContext, migrate hoặc seed identity data.
 
 Đọc upstream: `docs/v3-changes.md`.
 
@@ -161,7 +163,7 @@ Chấp nhận: Đủ tiền hoàn tất; thiếu tiền hủy đơn và trả t�
 | v0 | Có mã nền | Commit có sẵn `97ec50f`; chưa có commit/tag và ghi chú theo quy trình v0. Giữ nguyên lịch sử. |
 | v1 | Hoàn tất triển khai | Release 0 lỗi; ba migration độc lập; smoke PostgreSQL trực tiếp. Chưa chạy AppHost/Docker. Xem [ghi chú](chapters/v1.md). |
 | v2 | Hoàn tất triển khai | Release 0 lỗi; Catalog API/client CRUD và frontend HTTP đã smoke-test. Chưa chạy Docker. Xem [ghi chú](chapters/v2.md). |
-| v3 | Chưa bắt đầu | |
+| v3 | Hoàn tất theo tiêu chí ROADMAP | Release 0 lỗi; Identity API/client, JWT authorization và Web/Admin BFF. Passkey chưa chuyển từ UI cũ; chưa chạy Docker/HTTP smoke. Xem [ghi chú](chapters/v3.md). |
 | v4 | Chưa bắt đầu | |
 | v5 | Chưa bắt đầu | |
 | v6 | Chưa bắt đầu | |
