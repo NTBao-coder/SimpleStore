@@ -1,9 +1,9 @@
 using SimpleStore.Catalog.API.Client;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using SimpleStore.Data;
-using SimpleStore.Data.Identity;
 using SimpleStore.Web.Services;
+using SimpleStore.Identity.API.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,37 +12,21 @@ builder.AddServiceDefaults();
 // Add services
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Identity/Account/Login";
+        options.LogoutPath = "/Identity/Account/Logout";
+        options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+        options.SlidingExpiration = true;
+        options.EventsType = typeof(JwtCookieAuthenticationEvents);
+    });
+builder.Services.AddAuthorization();
 
 // Add DbContext
 builder.AddCatalogApiClient();
+builder.Services.AddIdentityApiClient();
 builder.AddNpgsqlDbContext<OrderDbContext>("orderdb");
-builder.AddNpgsqlDbContext<IdentityDbContext>("identitydb");
-
-// Add Identity (schema v3 enables the passkey table)
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-{
-    options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
-    options.Password.RequireDigit = true;
-    options.Password.RequiredLength = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.SignIn.RequireConfirmedAccount = false;
-})
-.AddEntityFrameworkStores<IdentityDbContext>()
-.AddDefaultTokenProviders();
-
-builder.Services.Configure<IdentityPasskeyOptions>(options =>
-{
-    options.AuthenticatorTimeout = TimeSpan.FromMinutes(2);
-});
-
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/Identity/Account/Login";
-    options.LogoutPath = "/Identity/Account/Logout";
-    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
-    options.SlidingExpiration = true;
-});
 
 // Session for cart
 builder.Services.AddSession(options =>
@@ -80,11 +64,7 @@ app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
 {
     var orders = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
-    var identity = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    await identity.Database.MigrateAsync();
     await orders.Database.MigrateAsync();
-    await DbSeeder.SeedIdentityAsync(userManager);
 }
 
 app.MapControllerRoute(

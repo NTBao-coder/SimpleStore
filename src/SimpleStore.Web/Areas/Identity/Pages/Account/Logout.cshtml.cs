@@ -1,24 +1,29 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SimpleStore.Data.Identity;
+using SimpleStore.Identity.API.Client;
 
 namespace SimpleStore.Web.Areas.Identity.Pages.Account;
 
 [AllowAnonymous]
 public class LogoutModel : PageModel
 {
-    private readonly SignInManager<ApplicationUser> _signInManager;
-
-    public LogoutModel(SignInManager<ApplicationUser> signInManager)
-    {
-        _signInManager = signInManager;
-    }
+    private readonly IIdentityApiClient _identity;
+    private readonly ITokenSessionStore _sessions;
+    public LogoutModel(IIdentityApiClient identity, ITokenSessionStore sessions) => (_identity, _sessions) = (identity, sessions);
 
     public async Task<IActionResult> OnPost(string? returnUrl = null)
     {
-        await _signInManager.SignOutAsync();
+        var sessionId = User.FindFirst(JwtCookieAuthenticationEvents.SessionIdClaim)?.Value;
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            var session = await _sessions.GetAsync(sessionId, HttpContext.RequestAborted);
+            if (session is not null) await _identity.LogoutAsync(session.RefreshToken, HttpContext.RequestAborted);
+            await _sessions.RemoveAsync(sessionId, HttpContext.RequestAborted);
+        }
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return LocalRedirect(returnUrl ?? Url.Content("~/"));
     }
 }

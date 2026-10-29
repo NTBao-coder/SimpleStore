@@ -1,23 +1,19 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SimpleStore.Data.Identity;
+using SimpleStore.Identity.API.Client;
 
 namespace SimpleStore.Web.Areas.Identity.Pages.Account;
 
 [AllowAnonymous]
 public class RegisterModel : PageModel
 {
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly UserManager<ApplicationUser> _userManager;
-
-    public RegisterModel(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
-    {
-        _signInManager = signInManager;
-        _userManager = userManager;
-    }
+    private readonly IIdentityApiClient _identity;
+    private readonly ITokenSessionStore _sessions;
+    public RegisterModel(IIdentityApiClient identity, ITokenSessionStore sessions) => (_identity, _sessions) = (identity, sessions);
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -56,25 +52,18 @@ public class RegisterModel : PageModel
             return Page();
         }
 
-        var user = new ApplicationUser
+        var response = await _identity.RegisterAsync(
+            new RegisterRequest(Input.Email, Input.FullName, Input.Password), HttpContext.RequestAborted);
+        if (response is null)
         {
-            UserName = Input.Email,
-            Email = Input.Email,
-            EmailConfirmed = true,
-            FullName = Input.FullName
-        };
-
-        var result = await _userManager.CreateAsync(user, Input.Password);
-        if (!result.Succeeded)
-        {
-            foreach (var err in result.Errors)
-            {
-                ModelState.AddModelError(string.Empty, err.Description);
-            }
+            ModelState.AddModelError(string.Empty, "Registration failed. Check the email and password requirements.");
             return Page();
         }
 
-        await _signInManager.SignInAsync(user, isPersistent: false);
+        var sessionId = Guid.NewGuid().ToString("N");
+        await _sessions.SaveAsync(sessionId, new TokenSession(response.AccessToken, response.RefreshToken, response.ExpiresAt));
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+            JwtCookieAuthenticationEvents.CreatePrincipal(response, sessionId), new AuthenticationProperties { AllowRefresh = true });
         return LocalRedirect(returnUrl);
     }
 }

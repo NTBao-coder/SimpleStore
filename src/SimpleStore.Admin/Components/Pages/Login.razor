@@ -1,0 +1,24 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+
+<PageTitle>Admin sign in</PageTitle>
+
+<div class="container py-5" style="max-width: 30rem">
+    <h1 class="h3 mb-4">Admin sign in</h1>
+    @if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("error"))
+    {
+        <div class="alert alert-danger">Invalid credentials or this account does not have the Admin role.</div>
+    }
+    <form method="post" action="/auth/login">
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input id="email" name="email" type="email" class="form-control" autocomplete="username" required />
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" name="password" type="password" class="form-control" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+    </form>
+</div>

@@ -1,6 +1,6 @@
 @page "/orders"
 @inject OrderDbContext OrderDb
-@inject IdentityDbContext IdentityDb
+@inject IIdentityApiClient Identity
 
 <PageTitle>Orders</PageTitle>
 
@@ -86,9 +86,8 @@ else
     {
         orders.Clear();
 
-        var users = await IdentityDb.Users
-            .AsNoTracking()
-            .ToDictionaryAsync(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? u.Id) : u.FullName);
+        var users = (await Identity.GetUsersAsync())
+            .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName);
 
         var rows = await OrderDb.Orders
             .AsNoTracking()

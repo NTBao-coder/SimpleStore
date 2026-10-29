@@ -26,6 +26,13 @@
                 </nav>
             </div>
             <div class="topbar-right">
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <form method="post" action="/auth/logout" class="d-inline me-3">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+                        </form>
+                    </Authorized>
+                </AuthorizeView>
                 <a class="topbar-link" href="https://localhost/" target="_blank" rel="noopener">
                     View storefront
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"

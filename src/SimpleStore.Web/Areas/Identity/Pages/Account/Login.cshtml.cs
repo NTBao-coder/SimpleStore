@@ -1,25 +1,20 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SimpleStore.Data.Identity;
+using SimpleStore.Identity.API.Client;
 
 namespace SimpleStore.Web.Areas.Identity.Pages.Account;
 
 [AllowAnonymous]
 public class LoginModel : PageModel
 {
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly UserManager<ApplicationUser> _userManager;
-
-    public LoginModel(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
-    {
-        _signInManager = signInManager;
-        _userManager = userManager;
-    }
+    private readonly IIdentityApiClient _identity;
+    private readonly ITokenSessionStore _sessions;
+    public LoginModel(IIdentityApiClient identity, ITokenSessionStore sessions) => (_identity, _sessions) = (identity, sessions);
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -41,17 +36,15 @@ public class LoginModel : PageModel
         public bool RememberMe { get; set; }
     }
 
-    public async Task OnGetAsync(string? returnUrl = null)
+    public Task OnGetAsync(string? returnUrl = null)
     {
         if (!string.IsNullOrEmpty(ErrorMessage))
         {
             ModelState.AddModelError(string.Empty, ErrorMessage);
         }
 
-        // Clear any leftover external cookie so login starts clean
-        await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
-
         ReturnUrl = returnUrl ?? Url.Content("~/");
+        return Task.CompletedTask;
     }
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
@@ -64,42 +57,27 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
-        if (result.Succeeded)
+        var response = await _identity.LoginAsync(new LoginRequest(Input.Email, Input.Password), HttpContext.RequestAborted);
+        if (response is not null)
         {
+            var sessionId = Guid.NewGuid().ToString("N");
+            await _sessions.SaveAsync(sessionId, new TokenSession(response.AccessToken, response.RefreshToken, response.ExpiresAt));
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                JwtCookieAuthenticationEvents.CreatePrincipal(response, sessionId),
+                new AuthenticationProperties { IsPersistent = Input.RememberMe, AllowRefresh = true });
             return LocalRedirect(returnUrl);
         }
-
-        if (result.IsLockedOut)
-        {
-            ModelState.AddModelError(string.Empty, "This account is locked.");
-        }
-        else
-        {
-            ModelState.AddModelError(string.Empty, "Invalid email or password.");
-        }
+        ModelState.AddModelError(string.Empty, "Invalid email or password, or the account is locked.");
 
         ReturnUrl = returnUrl;
         return Page();
     }
 
-    // Returns JSON PublicKeyCredentialRequestOptions for the WebAuthn assertion ceremony.
-    public async Task<IActionResult> OnPostPasskeyRequestOptionsAsync()
-    {
-        var optionsJson = await _signInManager.MakePasskeyRequestOptionsAsync(user: null);
-        return Content(optionsJson, "application/json");
-    }
+    public IActionResult OnPostPasskeyRequestOptionsAsync() => NotFound();
 
     // Receives the signed assertion (raw WebAuthn credential JSON) and signs the user in.
-    public async Task<IActionResult> OnPostPasskeyAssertAsync([FromBody] JsonElement credential, string? returnUrl = null)
+    public IActionResult OnPostPasskeyAssertAsync([FromBody] JsonElement credential, string? returnUrl = null)
     {
-        var credentialJson = credential.GetRawText();
-        var result = await _signInManager.PasskeySignInAsync(credentialJson);
-        if (!result.Succeeded)
-        {
-            return BadRequest(new { error = "Passkey sign-in failed." });
-        }
-
-        return new JsonResult(new { redirectTo = Url.IsLocalUrl(returnUrl) ? returnUrl : Url.Content("~/") });
+        return NotFound();
     }
 }
